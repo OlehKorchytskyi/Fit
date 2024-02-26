@@ -30,6 +30,8 @@ Fit {
     TextField("New tag", text: $input)
 }
 ```
+![tag_list_example](https://github.com/OlehKorchytskyi/Fit/assets/4789347/270802ea-6bea-455a-afa6-084ba48ffdba)
+
 
 ## Customisation
 
@@ -87,6 +89,7 @@ Fit(lineStyle: conveyorBeltStyle) {
     // views
 }
 ```
+![conveyor_belt_example](https://github.com/OlehKorchytskyi/Fit/assets/4789347/586f3c5c-f769-4ee0-a93d-2f6316ee9444)
 
 It is also possible to create a variable style:
 
@@ -103,7 +106,7 @@ Fit(lineStyle: fancyAlignJustified) {
     // views
 }
 ```
-
+![stretching_example](https://github.com/OlehKorchytskyi/Fit/assets/4789347/a926cac6-9ac5-431a-88cc-a62e4d7ee456)
 
 ## Installing
 
