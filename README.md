@@ -32,6 +32,8 @@ Fit {
 ```
 ![tag_list_example](https://github.com/OlehKorchytskyi/Fit/assets/4789347/270802ea-6bea-455a-afa6-084ba48ffdba)
 
+> [!NOTE]
+> Full code for this example: [Tag List Example](https://github.com/OlehKorchytskyi/FitPlayground/blob/main/FitPlayground/FitPlayground/Examples/TagListExample.swift).
 
 ## Customisation
 
@@ -91,6 +93,9 @@ Fit(lineStyle: conveyorBeltStyle) {
 ```
 ![conveyor_belt_example](https://github.com/OlehKorchytskyi/Fit/assets/4789347/586f3c5c-f769-4ee0-a93d-2f6316ee9444)
 
+> [!NOTE]
+> Full code for this example: [Conveyor Belt Example](https://github.com/OlehKorchytskyi/FitPlayground/blob/main/FitPlayground/FitPlayground/Examples/ConveyorBeltExample.swift).
+
 It is also possible to create a variable style:
 
 ```swift
@@ -107,6 +112,9 @@ Fit(lineStyle: fancyAlignJustified) {
 }
 ```
 ![stretching_example](https://github.com/OlehKorchytskyi/Fit/assets/4789347/a926cac6-9ac5-431a-88cc-a62e4d7ee456)
+
+> [!NOTE]
+> Full code for this example: [Long Text Example](https://github.com/OlehKorchytskyi/FitPlayground/blob/main/FitPlayground/FitPlayground/Examples/LongTextExample.swift).
 
 ## Installing
 
