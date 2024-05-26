@@ -31,10 +31,10 @@ extension Fit {
             let itemAlignment: VerticalAlignment
             
             var baseLine: CGFloat
-
-            private var maximumBaseLineExtend: CGFloat
             
-            var lineHeight: CGFloat { baseLine + maximumBaseLineExtend }
+            /// Expected line height, accounting for added items and alignments.
+            var lineHeight: CGFloat
+            var tallestAtIndex: Int
             
             /// Expected line length, accounting for added items and spacing in between.
             public private(set) var lineLength: CGFloat
@@ -44,11 +44,13 @@ extension Fit {
             /// Represents how much of the available space is left.
             public private(set) var availableSpace: CGFloat
             
-            private var firstItemSpacing: ViewSpacing
-            private var firstItemDimensions: ViewDimensions
+            private(set) var firstItemSpacing: ViewSpacing
+            private(set) var firstItemDimensions: ViewDimensions
             
-            private var lastItemSpacing: ViewSpacing
-            private var lastItemDimensions: ViewDimensions
+            private(set) var lastItemSpacing: ViewSpacing
+            private(set) var lastItemDimensions: ViewDimensions
+            
+            var localHorizontalStart: CGFloat = 0
             
             init(index: Int, leadingItem itemIndex: Int, dimensions: ViewDimensions, spacing: ViewSpacing, alignment: VerticalAlignment, availableSpace: CGFloat) {
                 self.index = index
@@ -60,8 +62,10 @@ extension Fit {
                 let itemBaseLine = dimensions[alignment]
 
                 baseLine = itemBaseLine
-                maximumBaseLineExtend = dimensions.height - itemBaseLine
-                                
+                
+                lineHeight = max(dimensions.height, itemBaseLine)
+                tallestAtIndex = itemIndex
+                
                 lineLength = dimensions.width
                 
                 firstItemSpacing = spacing
@@ -92,16 +96,25 @@ extension Fit {
                 cache.distances.append(distance)
                 
                 availableSpace -= spaceOccupied
-                
                 lineLength += spaceOccupied
                 
                 lastItemSpacing = spacing
                 lastItemDimensions = dimensions
-                                
+                
                 let itemBaseLine = dimensions[itemAlignment]
 
                 baseLine = max(baseLine, itemBaseLine)
-                maximumBaseLineExtend = max(maximumBaseLineExtend, dimensions.height - itemBaseLine)
+
+                let oldHeight = lineHeight
+                
+                // Calculate the line height based on the:
+                // * current baseline of the line;
+                // * item height minus item baseline (since it will vertically sit on the line baseline)
+                lineHeight = max(lineHeight, dimensions.height, baseLine + (dimensions.height - itemBaseLine))
+
+                if oldHeight < lineHeight {
+                    tallestAtIndex = itemIndex
+                }
                 
                 return true
             }
@@ -115,6 +128,7 @@ extension Fit {
         }
         
         var lines: [Line] = []
+        var longestLine: Line? = nil
         var lineStyle: [LineStyle] = []
                 
         init(capacity: Int) {
@@ -127,6 +141,27 @@ extension Fit {
             distances.reserveCapacity(capacity)
             
             lineStyle.reserveCapacity(capacity)
+        }
+        
+        // MARK: - Reseting cache
+        
+        var isDirty: Bool = false
+        var proposedContainer: ProposedViewSize?
+        
+        mutating func validate(forProposedContainer proposal: ProposedViewSize, afterReset performUpdate: (inout Self) -> Void) {
+            // If cache is dirty, or container changed size
+            if isDirty || proposedContainer != proposal {
+                // reset all buffers
+                reset()
+                // perform updated for the caller
+                performUpdate(&self)
+                
+                // clean the cache
+                isDirty = false
+                
+                // remember the size proposal to compare during the next validation
+                proposedContainer = proposal
+            }
         }
         
         mutating func reset() {
@@ -142,6 +177,7 @@ extension Fit {
             
             lines.removeAll()
             
+            longestLine = nil
         }
         
     }

@@ -77,10 +77,10 @@ public struct Fit {
         for index in subviews.indices {
             let subview = subviews[index]
             
-            let dimensions = subview.dimensions(in: .unspecified)
+            let dimensions = subview.dimensions(in: proposal)
             cache.dimensions.append(dimensions)
             
-            let size = subview.sizeThatFits(.unspecified)
+            let size = subview.sizeThatFits(proposal)
 
             cache.sizes.append(size)
             cache.proposals.append(ProposedViewSize(size))
@@ -118,7 +118,7 @@ public struct Fit {
             // requests to break before that, or after previous item
             let attemptToAppend = (breakAtIndex != index) && (breakLineBeforeAppending == false)
 
-            if attemptToAppend && line.appendIfPossible(
+            if attemptToAppend, line.appendIfPossible(
                 index,
                 dimensions: dimensions,
                 spacing: subview.spacing,
@@ -158,6 +158,7 @@ public struct Fit {
             cache.lines.append(currentLine)
         }
         
+        cache.longestLine = cache.lines.max(by: { $0.lineLength < $1.lineLength })
         
         var sizeThatFits = cache.lines.reduce(into: CGSize.zero) { size, line in
             let style = lineStyle.specific(for: line)
@@ -184,14 +185,16 @@ public struct Fit {
         
         for line in cache.lines {
             
-            let style = cache.lineStyle[line.index] //lineStyle.specific(for: line)
+            let style = cache.lineStyle[line.index]
             
             var horizontalOffset = horizontalStart(for: line, withStyle: style, in: bounds, subviews: subviews, cache: cache)
+            
+            cache.lines[line.index].localHorizontalStart = horizontalOffset - bounds.minX
             
             let baseLine = line.baseLine
                                     
             let indices = style.reversed ? line.indices.reversed() : line.indices
-            
+                        
             for index in indices {
                 let subview = subviews[index]
                 
