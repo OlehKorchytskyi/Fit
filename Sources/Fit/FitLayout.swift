@@ -12,16 +12,31 @@ extension Fit: Layout {
     
     public func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout LayoutCache) -> CGSize {
         guard subviews.isEmpty == false else { return .zero }
-        
         cache.validate(forProposedContainer: proposal) {
             prepareLines(subviews, inContainer: proposal, cache: &$0)
         }
-
         return cache.sizeThatFits
     }
     
     public func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout LayoutCache) {
-        guard subviews.isEmpty == false else { return }
+        guard cache.lines.isEmpty == false else { return }
+        
+        if cache.locations.count == subviews.count, proposal.width == cache.locationsProposal?.width {
+            
+            for index in subviews.indices {
+                let subview = subviews[index]
+                let cachedLocation = cache.locations[index]
+                let sizeProposal = cache.proposals[index]
+                
+                subview.place(at: CGPoint(x: cachedLocation.x + bounds.minX,
+                                          y: cachedLocation.y + bounds.minY), proposal: sizeProposal)
+            }
+            
+            return
+        }
+        
+        cache.prepareToCachePlacementLocations(subviews.count)
+        
         placeLines(in: bounds, proposal: proposal, subviews: subviews, cache: &cache)
     }
     
@@ -31,73 +46,24 @@ extension Fit: Layout {
         return properties
     }
     
-    
+    // Note: runs before .placeSubviews(...)
     public func spacing(subviews: Subviews, cache: inout LayoutCache) -> ViewSpacing {
-        var spacing = ViewSpacing()
+        guard subviews.isEmpty == false else { return ViewSpacing() }
+        guard subviews.count > 1 else { return subviews[0].spacing }
         
-        guard cache.lines.isEmpty == false else { return spacing }
-        
-        
-        let topLine = cache.lines.first!
-        
-        // Form a union top spacing if first(top) line has all
-        // its items aligned a the top
-        if case .top = topLine.itemAlignment {
-            for index in topLine.indices {
-                spacing.formUnion(subviews[index].spacing, edges: .top)
-            }
-        } 
-        // otherwise, use just tallest item to determine the top edge spacing
-        else {
-            spacing.formUnion(subviews[topLine.tallestAtIndex].spacing, edges: .top)
+        if cache.isClean, let spacing = cache.spacing {
+            return spacing
         }
         
-        
-        let longestLine = cache.longestLine!
-        // For leading and trailing edges we need to take lines alignment into account
-        switch lineStyle.alignment {
-        case .leading:
-            // Form a union leading spacing of the first item in each line
-            for line in cache.lines {
-                spacing.formUnion(line.firstItemSpacing, edges: .leading)
-            }
-            
-            // For a trailing edge use the spacing of the last item in the longest line
-            spacing.formUnion(longestLine.lastItemSpacing, edges: .trailing)
-            
-        case .center:
-            // When lines are centered we only need to merge 
-            // first and last items in the longest line
-            spacing.formUnion(longestLine.firstItemSpacing, edges: .leading)
-            spacing.formUnion(longestLine.lastItemSpacing, edges: .trailing)
-            
-        case .trailing:
-            // Form a union trailing spacing of the last item in each line
-            for line in cache.lines {
-                spacing.formUnion(line.lastItemSpacing, edges: .trailing)
-            }
-            
-            // For a leading edge use the spacing of the first item in the longest line
-            spacing.formUnion(longestLine.firstItemSpacing, edges: .leading)
+        let spacing = subviews.dropFirst().reduce(into: subviews[0].spacing) {
+            $0.formUnion($1.spacing)
         }
         
-        
-        let bottomLine = cache.lines.first!
-        
-        // Form a union bottom spacing if last(bottom) line has all
-        // its items aligned a the bottom
-        if case .bottom = bottomLine.itemAlignment {
-            for index in bottomLine.indices {
-                spacing.formUnion(subviews[index].spacing, edges: .bottom)
-            }
-        } 
-        // otherwise, use just tallest item to determine the bottom edge spacing
-        else {
-            spacing.formUnion(subviews[bottomLine.tallestAtIndex].spacing, edges: .bottom)
-        }
+        cache.spacing = spacing
         
         return spacing
     }
+    
     
     // MARK: - Caching
     

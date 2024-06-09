@@ -17,6 +17,7 @@ public enum ItemSpacing {
     case fixed(CGFloat)
     
     @inlinable
+    @inline(__always)
     func distance(between leadingViewSpacing: ViewSpacing, and trailingViewSpacing: ViewSpacing) -> CGFloat {
         switch self {
         case .viewSpacing(minimum: let spacing):

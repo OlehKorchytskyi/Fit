@@ -15,121 +15,21 @@ extension Fit {
         
         var sizeThatFits: CGSize = .zero
         
+        var spacing: ViewSpacing?
+        
         var sizes: [CGSize] = []
         var proposals: [ProposedViewSize] = []
         var dimensions: [ViewDimensions] = []
         
+        /// Distances to the previous subview.
         var distances: [CGFloat] = []
         
-        /// Represents the group of items forming the line.
-        public struct Line {
-            
-            public let index: Int
-            
-            private(set) var indices: [Int] = []
-            
-            let itemAlignment: VerticalAlignment
-            
-            var baseLine: CGFloat
-            
-            /// Expected line height, accounting for added items and alignments.
-            var lineHeight: CGFloat
-            var tallestAtIndex: Int
-            
-            /// Expected line length, accounting for added items and spacing in between.
-            public private(set) var lineLength: CGFloat
-            
-            /// Represents how much of the available space was offered by the container during the layout process.
-            public private(set) var availableSpaceOffered: CGFloat
-            /// Represents how much of the available space is left.
-            public private(set) var availableSpace: CGFloat
-            
-            private(set) var firstItemSpacing: ViewSpacing
-            private(set) var firstItemDimensions: ViewDimensions
-            
-            private(set) var lastItemSpacing: ViewSpacing
-            private(set) var lastItemDimensions: ViewDimensions
-            
-            var localHorizontalStart: CGFloat = 0
-            
-            init(index: Int, leadingItem itemIndex: Int, dimensions: ViewDimensions, spacing: ViewSpacing, alignment: VerticalAlignment, availableSpace: CGFloat) {
-                self.index = index
-                
-                indices = [itemIndex]
-                
-                itemAlignment = alignment
-                
-                let itemBaseLine = dimensions[alignment]
-
-                baseLine = itemBaseLine
-                
-                lineHeight = max(dimensions.height, itemBaseLine)
-                tallestAtIndex = itemIndex
-                
-                lineLength = dimensions.width
-                
-                firstItemSpacing = spacing
-                lastItemSpacing = spacing
-                
-                firstItemDimensions = dimensions
-                lastItemDimensions = dimensions
-                
-                let space = max(0, availableSpace - dimensions.width)
-                self.availableSpaceOffered = availableSpace
-                self.availableSpace = space
-            }
-            
-            
-            mutating func appendIfPossible(
-                _ itemIndex: Int,
-                dimensions: ViewDimensions,
-                spacing: ViewSpacing,
-                spacingRule: ItemSpacing,
-                cache: inout LayoutCache
-            ) -> Bool {
-                let distance = spacingRule.distance(between: lastItemSpacing, and: spacing)
-                let spaceOccupied = distance + dimensions.width
-
-                guard spaceOccupied <= availableSpace else { return false }
-                
-                indices.append(itemIndex)
-                cache.distances.append(distance)
-                
-                availableSpace -= spaceOccupied
-                lineLength += spaceOccupied
-                
-                lastItemSpacing = spacing
-                lastItemDimensions = dimensions
-                
-                let itemBaseLine = dimensions[itemAlignment]
-
-                baseLine = max(baseLine, itemBaseLine)
-
-                let oldHeight = lineHeight
-                
-                // Calculate the line height based on the:
-                // * current baseline of the line;
-                // * item height minus item baseline (since it will vertically sit on the line baseline)
-                lineHeight = max(lineHeight, dimensions.height, baseLine + (dimensions.height - itemBaseLine))
-
-                if oldHeight < lineHeight {
-                    tallestAtIndex = itemIndex
-                }
-                
-                return true
-            }
-            
-            func maximumStretch(to itemIndex: Int) -> CGFloat {
-                guard indices.first != itemIndex else { return 0 }
-                guard indices.count > 1 else { return 0 }
-                return availableSpace / CGFloat(indices.count - 1)
-            }
-            
-        }
-        
         var lines: [Line] = []
-        var longestLine: Line? = nil
-        var lineStyle: [LineStyle] = []
+        var specificLineStyles: [LineStyle] = []
+        
+        /// Cached locations after placing subviews
+        var locations: [CGPoint] = []
+        var locationsProposal: ProposedViewSize? = nil
                 
         init(capacity: Int) {
             sizeThatFits = .zero
@@ -140,17 +40,33 @@ extension Fit {
             
             distances.reserveCapacity(capacity)
             
-            lineStyle.reserveCapacity(capacity)
+            specificLineStyles.reserveCapacity(capacity)
+            
+            locations.reserveCapacity(capacity)
+        }
+        
+        // MARK: - Cached Locations
+        @inline(__always)
+        mutating func prepareToCachePlacementLocations(_ capacity: Int) {
+            let zeroLocation: CGPoint = .zero
+            locations = Array(repeating: zeroLocation, count: capacity)
+        }
+        
+        @inline(__always)
+        mutating func cacheLocation(_ location: CGPoint, at index: Int) {
+            locations[index] = location
         }
         
         // MARK: - Reseting cache
         
         var isDirty: Bool = false
+        var isClean: Bool { isDirty == false }
         var proposedContainer: ProposedViewSize?
         
+        @inline(__always)
         mutating func validate(forProposedContainer proposal: ProposedViewSize, afterReset performUpdate: (inout Self) -> Void) {
             // If cache is dirty, or container changed size
-            if isDirty || proposedContainer != proposal {
+            if isDirty || proposedContainer?.width != proposal.width {
                 // reset all buffers
                 reset()
                 // perform updated for the caller
@@ -164,8 +80,11 @@ extension Fit {
             }
         }
         
+        @inline(__always)
         mutating func reset() {
             sizeThatFits = .zero
+            
+            spacing = nil
             
             sizes.removeAll(keepingCapacity: true)
             proposals.removeAll(keepingCapacity: true)
@@ -173,12 +92,16 @@ extension Fit {
             
             distances.removeAll(keepingCapacity: true)
             
-            lineStyle.removeAll(keepingCapacity: true)
+            specificLineStyles.removeAll(keepingCapacity: true)
             
             lines.removeAll()
             
-            longestLine = nil
+            resetPlacementLocations()
         }
         
+        mutating func resetPlacementLocations() {
+            locations.removeAll(keepingCapacity: true)
+            locationsProposal = nil
+        }
     }
 }

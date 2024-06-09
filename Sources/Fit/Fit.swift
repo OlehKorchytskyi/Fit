@@ -64,110 +64,116 @@ public struct Fit {
         self.itemSpacing = itemSpacing
     }
     
-    // MARK: Forming container
+    // MARK: Forming the container
     
     func prepareLines(_ subviews: Subviews, inContainer proposal: ProposedViewSize, cache: inout LayoutCache) {
         
         let container = proposal.replacingUnspecifiedDimensions()
+        let availableSpace = container.width
         
-        var currentLine: LayoutCache.Line?
+        var indices = subviews.indices
         
-        var breakAtIndex = -1
+        // Preparing reassignable attributes
+        var currentIndex = indices.removeFirst()
+        var currentItem = subviews[currentIndex]
+        var currentDimensions = currentItem.dimensions(in: proposal)
+        var currentSizeThatFits = currentItem.sizeThatFits(proposal)
+        var currentSpacing = currentItem.spacing
         
-        for index in subviews.indices {
-            let subview = subviews[index]
-            
-            let dimensions = subview.dimensions(in: proposal)
-            cache.dimensions.append(dimensions)
-            
-            let size = subview.sizeThatFits(proposal)
-
-            cache.sizes.append(size)
-            cache.proposals.append(ProposedViewSize(size))
-            
-            // capture current line
-            var line: LayoutCache.Line! = currentLine
-            // or create a new one if there is no one
-            if line == nil {
-                line = LayoutCache.Line(
-                    index: cache.lines.count,
-                    leadingItem: index,
-                    dimensions: dimensions,
-                    spacing: subview.spacing,
-                    alignment: itemAlignment,
-                    availableSpace: container.width
-                )
-                
-                cache.distances.append(0)
-                currentLine = line
-
-                continue
-            }
-            
-            // Extract the line break request
-            let lineBreak = subview[LineBreakKey.self]
-            
-            // Check if we should break before appending the item 
-            // and that conditions are met
-            var breakLineBeforeAppending = false
-            if let lineBreak, lineBreak.before {
-                breakLineBeforeAppending = lineBreak.condition(line)
-            }
-
-            // We should not attempt to append if the attached LineBreak
-            // requests to break before that, or after previous item
-            let attemptToAppend = (breakAtIndex != index) && (breakLineBeforeAppending == false)
-
-            if attemptToAppend, line.appendIfPossible(
-                index,
-                dimensions: dimensions,
-                spacing: subview.spacing,
-                spacingRule: itemSpacing,
-                cache: &cache
-            ) {
-                // updating current line to continue filling it on the next step
-                currentLine = line
-
-            } else {
-                // if line has no space left:
-                // 1. cache it
-                // 2. create new line
-                
-                cache.lines.append(line)
-                
-                cache.distances.append(0)
-                currentLine = LayoutCache.Line(
-                    index: cache.lines.count,
-                    leadingItem: index,
-                    dimensions: dimensions,
-                    spacing: subview.spacing,
-                    alignment: itemAlignment,
-                    availableSpace: container.width
-                )
-            }
-            
-            // Check and remember if we should break before appending the NEXT item
-            // and that conditions are met
-            if let lineBreak, lineBreak.after, lineBreak.condition(line) {
-                breakAtIndex = index + 1
-            }
+        // Caching attributes for the first item
+        cache.dimensions.append(currentDimensions)
+        cache.sizes.append(currentSizeThatFits)
+        cache.proposals.append(ProposedViewSize(currentSizeThatFits))
+        
+        // Creating the function which creates new line from the attributes
+        func newLineFromCurrentSubview() -> LayoutCache.Line {
+            cache.distances.append(0) // adding zero spacing for the first item in the line
+            return LayoutCache.Line(
+                index: cache.lines.count,
+                leadingItem: currentIndex,
+                dimensions: currentDimensions,
+                spacing: currentSpacing,
+                alignment: itemAlignment,
+                availableSpace: availableSpace
+            )
         }
         
-        // caching last line
-        if let currentLine {
+        // Creating first line
+        var currentLine = newLineFromCurrentSubview()
+                
+        func cacheCurrentLine() {
             cache.lines.append(currentLine)
         }
         
-        cache.longestLine = cache.lines.max(by: { $0.lineLength < $1.lineLength })
-        
+        if indices.isEmpty {
+            cacheCurrentLine()
+        } else {
+            var forceNewLineLater = false
+            if let lineBreak = currentItem[LineBreakKey.self], lineBreak.after {
+                // Check if the current item has attached request
+                // to create new line after appending
+                forceNewLineLater = lineBreak.condition(currentLine)
+            }
+            
+            while indices.isEmpty == false {
+                currentIndex = indices.removeFirst()
+                currentItem = subviews[currentIndex]
+                currentDimensions = currentItem.dimensions(in: proposal)
+                currentSizeThatFits = currentItem.sizeThatFits(proposal)
+                currentSpacing = currentItem.spacing
+                
+                cache.dimensions.append(currentDimensions)
+                cache.sizes.append(currentSizeThatFits)
+                cache.proposals.append(ProposedViewSize(currentSizeThatFits))
+                
+                var startNewLine = forceNewLineLater
+                forceNewLineLater = false
+                
+                if let lineBreak = currentItem[LineBreakKey.self] {
+                    // Check if the current item has attached request to:
+                    if lineBreak.before {
+                        // Create new line before appending
+                        startNewLine = lineBreak.condition(currentLine)
+                    } else {
+                        // Create new line after appending
+                        forceNewLineLater = true
+                    }
+                }
+                
+                if startNewLine {
+                    cacheCurrentLine()
+                    currentLine = newLineFromCurrentSubview()
+                } else if currentLine.appendIfPossible(
+                    currentIndex,
+                    dimensions: currentDimensions,
+                    spacing: currentSpacing,
+                    spacingRule: itemSpacing,
+                    distances: &cache.distances
+                ) {
+                    // Did successfully fit current item into the current line.
+                } else {
+                    // Cannot fit current item into the current line.
+                    // Cache current line and creating a new one
+                    cacheCurrentLine()
+                    currentLine = newLineFromCurrentSubview()
+                }
+                
+                if indices.isEmpty {
+                    // Caching current line if there is no items left
+                    cacheCurrentLine()
+                }
+            }
+        }
+                
         var sizeThatFits = cache.lines.reduce(into: CGSize.zero) { size, line in
             let style = lineStyle.specific(for: line)
-            cache.lineStyle.append(style)
+            cache.specificLineStyles.append(style)
+            
             size.width = style.stretched ? container.width : max(size.width, line.lineLength)
             size.height += line.lineHeight
         }
         
-        // accounting for the space between rows
+        // accounting for the space between lines
         if cache.lines.count > 1 {
             sizeThatFits.height += lineSpacing * CGFloat(cache.lines.count - 1)
         }
@@ -178,36 +184,45 @@ public struct Fit {
     // MARK: - Placing Lines
     
     func placeLines(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout LayoutCache) {
-
-        guard cache.lines.isEmpty == false else { return }
-        
+                
         var verticalOffset: CGFloat = bounds.minY
-        
+
         for line in cache.lines {
-            
-            let style = cache.lineStyle[line.index]
-            
-            var horizontalOffset = horizontalStart(for: line, withStyle: style, in: bounds, subviews: subviews, cache: cache)
-            
-            cache.lines[line.index].localHorizontalStart = horizontalOffset - bounds.minX
-            
-            let baseLine = line.baseLine
                                     
+            // Extract already specified style for current line
+            let style = cache.specificLineStyles[line.index]
+            
+            // Determine where the line will start to place items
+            var horizontalOffset = horizontalStart(for: line, withStyle: style, in: bounds, subviews: subviews, cache: cache)
+//            // Remember line start point, in terms of Fit container bounds
+//            cache.lines[line.index].localHorizontalStart = horizontalOffset - bounds.minX
+            
+            // Use the lowest baseline as a general baseline every item lays on
+            let generalBaseline = max(0, line.baseline.lowest)
+            
+            // Determine the order of the indices that will be iterated through
             let indices = style.reversed ? line.indices.reversed() : line.indices
-                        
+            
             for index in indices {
+                                
                 let subview = subviews[index]
                 
                 let size = cache.sizes[index]
                 let sizeProposal = cache.proposals[index]
                 
+                // Extract distance to the previous item
+                // Note: always 0 for the first item in the row
                 var distance = cache.distances[index]
                 
                 if style.stretched {
+                    // For the stretched lines, add additional spacing to the distance
+                    // to fill the available space left
                     distance += line.maximumStretch(to: index)
                 }
                 
                 if style.reversed == false {
+                    // If NOT reversed:
+                    // Apply spacing between items before placing an item
                     horizontalOffset += distance
                 }
                 
@@ -216,21 +231,31 @@ public struct Fit {
                 let dimensions = cache.dimensions[index]
                 let itemBaseline = dimensions[itemAlignment]
                 
-                itemPosition.y += baseLine - itemBaseline
-
+                // Push item down by the general baseline length
+                // and offset it by the item personal baseline length
+                itemPosition.y += generalBaseline - itemBaseline
+                
                 subview.place(at: itemPosition, proposal: sizeProposal)
+                let location = CGPoint(x: itemPosition.x - bounds.minX,
+                                       y: itemPosition.y - bounds.minY)
+                cache.cacheLocation(location, at: index)
+                
+                // Account for the placed item width
+                horizontalOffset += size.width
                 
                 if style.reversed {
+                    // If it IS reversed:
+                    // Apply spacing between items after placing an item
                     horizontalOffset += distance
                 }
                 
-                horizontalOffset += size.width
             }
             
             verticalOffset += line.lineHeight + lineSpacing
 
         }
-
+        
+        cache.locationsProposal = proposal
     }
     
     @inlinable
