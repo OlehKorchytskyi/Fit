@@ -47,6 +47,8 @@ Fit(lineAlignment: .center, lineSpacing: 12) {
     // views
 }
 ```
+> [!NOTE]
+> The default line spacing is **.viewSpacing**, which merges spacing of all items in the line and then uses vertical distance, [ViewSpacing.distance](https://developer.apple.com/documentation/swiftui/viewspacing/distance(to:along:)), to add spacing between to lines.
 
 #### Item Alignment and Spacing
 
@@ -54,7 +56,7 @@ You can align items in the same way you would do in **HStack**:
 
 ```swift
 // fixed item spacing
-Fit(itemAlignment: .firstTextBaseline, itemSpacing: .fixed(8)) {
+Fit(itemAlignment: .firstTextBaseline, itemSpacing: 8) {
     // views
 }
 
@@ -120,7 +122,7 @@ Fit(lineStyle: fancyAlignJustified) {
 
 Use **Swift Package Manager** to get **Fit**:
 ```swift
-.package(url: "https://github.com/OlehKorchytskyi/Fit", from: "1.0.0")
+.package(url: "https://github.com/OlehKorchytskyi/Fit", from: "1.0.2")
 ```
 
 Import **Fit** into your Swift code:
