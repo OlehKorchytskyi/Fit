@@ -23,12 +23,14 @@ extension Fit {
         
         /// Distances to the previous subview.
         var distances: [CGFloat] = []
+        /// Distances to the previous line.
+        var lineDistances: [CGFloat] = []
         
-        var lines: [Line] = []
+        private(set) var lines: [Line] = []
         var specificLineStyles: [LineStyle] = []
         
         /// Cached locations after placing subviews
-        var locations: [CGPoint] = []
+        private(set) var locations: [CGPoint] = []
         var locationsProposal: ProposedViewSize? = nil
                 
         init(capacity: Int) {
@@ -43,6 +45,19 @@ extension Fit {
             specificLineStyles.reserveCapacity(capacity)
             
             locations.reserveCapacity(capacity)
+        }
+        
+        // MARK: - Cached Lines
+        @inline(__always)
+        mutating func cacheLine(_ line: Line, lineSpacing: LineSpacing) {
+            let distance: CGFloat = if let lastLineSpacing = lines.last?.spacing {
+                lineSpacing.distance(between: lastLineSpacing, and: line.spacing)
+            } else {
+                0
+            }
+            
+            lineDistances.append(distance)
+            lines.append(line)
         }
         
         // MARK: - Cached Locations
@@ -91,6 +106,7 @@ extension Fit {
             dimensions.removeAll(keepingCapacity: true)
             
             distances.removeAll(keepingCapacity: true)
+            lineDistances.removeAll(keepingCapacity: true)
             
             specificLineStyles.removeAll(keepingCapacity: true)
             

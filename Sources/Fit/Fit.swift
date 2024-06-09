@@ -2,7 +2,7 @@ import SwiftUI
 
 
 
-/// Automatically forms lines from the elements, using **.sizeThatFits(.unspecified)** to determine each element size.
+/// Automatically forms lines from the elements, using **.sizeThatFits(proposal)** to determine each element size.
 ///
 /// Add your views just like you would do it with all other **SwiftUI** stacks:
 ///
@@ -17,7 +17,7 @@ import SwiftUI
 public struct Fit {
 
     public let lineStyle: LineStyle
-    public let lineSpacing: CGFloat
+    public let lineSpacing: LineSpacing
     
     public let itemAlignment: VerticalAlignment
     public let itemSpacing: ItemSpacing
@@ -25,20 +25,18 @@ public struct Fit {
     /// Initialises ``Fit`` with a custom ``LineStyle``.
     /// - Parameters:
     ///   - lineStyle: description of a line style represented by ``LineStyle``;
-    ///   - lineSpacing: fixed spacing between lines;
+    ///   - lineSpacing: configuration of spacing between lines represented by ``LineSpacing``;
     ///   - itemAlignment: vertical items alignment, behaves in the same way as HStack alignment;
     ///   - itemSpacing: configuration of spacing between items represented by ``ItemSpacing``.
-    ///   The default implementation uses **.viewSpacing** option which takes preferred distance based on views ViewSpacing.
-    ///   To specify fixed item spacing use **.fixed(CGFloat)** option.
-    ///
     public init(
         lineStyle: LineStyle,
-        lineSpacing: CGFloat = 8,
+        lineSpacing: LineSpacing = .viewSpacing,
         itemAlignment: VerticalAlignment = .center,
-        itemSpacing: ItemSpacing = .viewSpacing(minimum: 0)
+        itemSpacing: ItemSpacing = .viewSpacing
     ) {
         self.lineStyle = lineStyle
         self.lineSpacing = lineSpacing
+        
         self.itemAlignment = itemAlignment
         self.itemSpacing = itemSpacing
     }
@@ -46,15 +44,15 @@ public struct Fit {
     /// Initialises ``Fit`` with a set of static attributes.
     /// - Parameters:
     ///   - lineAlignment: alignment of the lines in the container;
-    ///   - lineSpacing: fixed spacing between lines;
+    ///   - lineSpacing: configuration of spacing between lines represented by ``LineSpacing``;
     ///   - itemAlignment: vertical items alignment, behaves in the same way as HStack alignment;
     ///   - itemSpacing: configuration of spacing between items represented by ``ItemSpacing``;
     ///   - stretched: determines container should be stretched to fill available space.
     public init(
         lineAlignment: LineAlignment = .leading,
-        lineSpacing: CGFloat = 8,
+        lineSpacing: LineSpacing = .viewSpacing,
         itemAlignment: VerticalAlignment = .center,
-        itemSpacing: ItemSpacing = .viewSpacing(minimum: 0),
+        itemSpacing: ItemSpacing = .viewSpacing,
         stretched: Bool = false
     ) {
         self.lineStyle = LineStyle(alignment: lineAlignment, reversed: false, stretched: stretched)
@@ -102,7 +100,7 @@ public struct Fit {
         var currentLine = newLineFromCurrentSubview()
                 
         func cacheCurrentLine() {
-            cache.lines.append(currentLine)
+            cache.cacheLine(currentLine, lineSpacing: lineSpacing)
         }
         
         if indices.isEmpty {
@@ -165,20 +163,16 @@ public struct Fit {
             }
         }
                 
-        var sizeThatFits = cache.lines.reduce(into: CGSize.zero) { size, line in
+        cache.sizeThatFits = cache.lines.reduce(into: CGSize.zero) { size, line in
             let style = lineStyle.specific(for: line)
             cache.specificLineStyles.append(style)
+            
+            // accounting for the space between lines
+            size.height += cache.lineDistances[line.index]
             
             size.width = style.stretched ? container.width : max(size.width, line.lineLength)
             size.height += line.lineHeight
         }
-        
-        // accounting for the space between lines
-        if cache.lines.count > 1 {
-            sizeThatFits.height += lineSpacing * CGFloat(cache.lines.count - 1)
-        }
-        
-        cache.sizeThatFits = sizeThatFits
     }
     
     // MARK: - Placing Lines
@@ -188,7 +182,14 @@ public struct Fit {
         var verticalOffset: CGFloat = bounds.minY
 
         for line in cache.lines {
-                                    
+            
+            // Extract distance to the previous line
+            // Note: always 0 for the line
+            let lineSpacing = cache.lineDistances[line.index]
+            
+            // Apply spacing lines before placing lien items
+            verticalOffset += lineSpacing
+            
             // Extract already specified style for current line
             let style = cache.specificLineStyles[line.index]
             
@@ -212,18 +213,18 @@ public struct Fit {
                 
                 // Extract distance to the previous item
                 // Note: always 0 for the first item in the row
-                var distance = cache.distances[index]
+                var itemSpacing = cache.distances[index]
                 
                 if style.stretched {
                     // For the stretched lines, add additional spacing to the distance
                     // to fill the available space left
-                    distance += line.maximumStretch(to: index)
+                    itemSpacing += line.maximumStretch(to: index)
                 }
                 
                 if style.reversed == false {
                     // If NOT reversed:
                     // Apply spacing between items before placing an item
-                    horizontalOffset += distance
+                    horizontalOffset += itemSpacing
                 }
                 
                 var itemPosition = CGPoint(x: horizontalOffset, y: verticalOffset)
@@ -246,12 +247,12 @@ public struct Fit {
                 if style.reversed {
                     // If it IS reversed:
                     // Apply spacing between items after placing an item
-                    horizontalOffset += distance
+                    horizontalOffset += itemSpacing
                 }
                 
             }
             
-            verticalOffset += line.lineHeight + lineSpacing
+            verticalOffset += line.lineHeight
 
         }
         

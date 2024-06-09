@@ -1,55 +1,57 @@
 //
-//  ItemSpacing.swift
+//  LineSpacing.swift
 //
 //
-//  Created by Oleh Korchytskyi on 09.01.2024.
+//  Created by Oleh Korchytskyi on 09.06.2024.
 //
 
 import SwiftUI
 
 
-/// Defines an item spacing rule in the ``Fit`` layout.
+/// Defines the line spacing rule in the ``Fit`` layout.
 ///
 /// Also can be constructed using Integer or Float literal:
 /// ```
-/// let spacing: ItemSpacing = 8    // .fixed(8)
-/// let spacing: ItemSpacing = 10.5 // .fixed(10.5)
+/// let spacing: LineSpacing = 8    // .fixed(8)
+/// let spacing: LineSpacing = 10.5 // .fixed(10.5)
 /// ```
-public enum ItemSpacing: ExpressibleByFloatLiteral, ExpressibleByIntegerLiteral {
+public enum LineSpacing: ExpressibleByFloatLiteral, ExpressibleByIntegerLiteral {
     /// Uses **ViewSpacing** distance to determine preferred spacing, but not less then specified minimum.
     case viewSpacing(minimum: CGFloat)
     
-    /// Fixed spacing beween subviews.
+    /// Fixed spacing between lines.
     case fixed(CGFloat)
     
     /// Uses **ViewSpacing** distance to determine preferred spacing.
-    public static var viewSpacing: ItemSpacing { 
+    public static var viewSpacing: LineSpacing { 
         .viewSpacing(minimum: -.infinity)
     }
     
     @inline(__always)
-    func distance(between leadingViewSpacing: ViewSpacing, and trailingViewSpacing: ViewSpacing) -> CGFloat {
+    func distance(between topViewSpacing: ViewSpacing, and bottomViewSpacing: ViewSpacing) -> CGFloat {
         switch self {
         case .viewSpacing(minimum: let minimumSpacing):
-            max(minimumSpacing, leadingViewSpacing.distance(to: trailingViewSpacing, along: .horizontal))
+            let spacing = max(minimumSpacing, topViewSpacing.distance(to: bottomViewSpacing, along: .vertical))
+//            print(spacing, topViewSpacing, bottomViewSpacing)
+//            print()
+            return spacing
         case .fixed(let spacing):
-            spacing
+            return spacing
         }
     }
     
     // MARK: ExpressibleByFloatLiteral
-    /// Creates **.fixed** ``ItemSpacing``.
+    /// Creates **.fixed** ``LineSpacing``.
     /// - Parameter value: spacing distance.
     public init(floatLiteral value: Double) {
         self = .fixed(value)
     }
     
     // MARK: ExpressibleByIntegerLiteral
-    /// Creates **.fixed** ``ItemSpacing``.
+    /// Creates **.fixed** ``LineSpacing``.
     /// - Parameter value: spacing distance.
     public init(integerLiteral value: Int) {
         self = .fixed(CGFloat(value))
     }
     
 }
-

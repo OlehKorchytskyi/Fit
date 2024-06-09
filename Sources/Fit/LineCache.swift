@@ -40,6 +40,9 @@ extension Fit.LayoutCache {
         
         var localHorizontalStart: CGFloat = 0
         
+        /// Spacing of the line.
+        var spacing: ViewSpacing
+        
         @inline(__always)
         init(index: Int, leadingItem itemIndex: Int, dimensions: ViewDimensions, spacing: ViewSpacing, alignment: VerticalAlignment, availableSpace: CGFloat) {
             self.index = index
@@ -63,6 +66,8 @@ extension Fit.LayoutCache {
 
             self.availableSpaceOffered = availableSpace
             self.availableSpace = max(0, availableSpace - dimensions.width)
+            
+            self.spacing = spacing
         }
         
         @inline(__always)
@@ -91,6 +96,8 @@ extension Fit.LayoutCache {
             
             baseline.appendItem(dimensions.height, baseline: itemBaseline)
             lineHeight = baseline.height
+            
+            self.spacing.formUnion(spacing, edges: .vertical)
             
             return true
         }
