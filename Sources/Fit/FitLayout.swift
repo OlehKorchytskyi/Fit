@@ -21,7 +21,7 @@ extension Fit: Layout {
     public func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout LayoutCache) {
         guard cache.lines.isEmpty == false else { return }
         
-        if cache.locations.count == subviews.count, proposal.width == cache.locationsProposal?.width {
+        if cache.locations.count == subviews.count {
             
             for index in subviews.indices {
                 let subview = subviews[index]

@@ -31,12 +31,9 @@ public enum LineSpacing: ExpressibleByFloatLiteral, ExpressibleByIntegerLiteral 
     func distance(between topViewSpacing: ViewSpacing, and bottomViewSpacing: ViewSpacing) -> CGFloat {
         switch self {
         case .viewSpacing(minimum: let minimumSpacing):
-            let spacing = max(minimumSpacing, topViewSpacing.distance(to: bottomViewSpacing, along: .vertical))
-//            print(spacing, topViewSpacing, bottomViewSpacing)
-//            print()
-            return spacing
+            max(minimumSpacing, topViewSpacing.distance(to: bottomViewSpacing, along: .vertical))
         case .fixed(let spacing):
-            return spacing
+            spacing
         }
     }
     

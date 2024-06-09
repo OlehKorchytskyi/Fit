@@ -112,10 +112,6 @@ extension Fit {
             
             lines.removeAll()
             
-            resetPlacementLocations()
-        }
-        
-        mutating func resetPlacementLocations() {
             locations.removeAll(keepingCapacity: true)
             locationsProposal = nil
         }
